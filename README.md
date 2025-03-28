@@ -60,7 +60,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 Your Name - [@yourusername](https://twitter.com/yourusername)
 
-Project Link: [https://github.com/yourusername/shopease](https://github.com/yourusername/shopease)
+Project Link: [git clone https://github.com/yourusername/shopease.git](git clone https://github.com/yourusername/shopease.git)
 
 ## 🙏 Acknowledgments
 
