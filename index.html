@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShopEase - Modern E-Commerce</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3B82F6;
+            --secondary-color: #10B981;
+        }
+        
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .bottom-nav-item.active {
+            color: var(--primary-color);
+        }
+
+        .content-area {
+            padding-bottom: 80px;
+        }
+
+        .ripple {
+            position: relative;
+            overflow: hidden;
+            transform: translate3d(0, 0, 0);
+        }
+
+        .ripple:after {
+            content: "";
+            display: block;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            background-image: radial-gradient(circle, #000 10%, transparent 10.01%);
+            background-repeat: no-repeat;
+            background-position: 50%;
+            transform: scale(10, 10);
+            opacity: 0;
+            transition: transform .5s, opacity 1s;
+        }
+
+        .ripple:active:after {
+            transform: scale(0, 0);
+            opacity: .2;
+            transition: 0s;
+        }
+
+        /* Carousel Styles */
+        .carousel {
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .carousel-item {
+            scroll-snap-align: start;
+        }
+
+        /* Categories Scroll */
+        .categories-scroll {
+            scrollbar-width: none;
+        }
+        
+        .categories-scroll::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Product Card Animation */
+        .product-card {
+            transition: transform 0.2s;
+        }
+        
+        .product-card:active {
+            transform: scale(0.98);
+        }
+
+        /* Loading Skeleton */
+        .skeleton {
+            animation: skeleton-loading 1s linear infinite alternate;
+        }
+
+        @keyframes skeleton-loading {
+            0% {
+                background-color: #E5E7EB;
+            }
+            100% {
+                background-color: #F3F4F6;
+            }
+        }
+    </style>
+    <script>
+        // Initialize data
+        let cart = [];
+        let wishlist = new Set();
+        let currentSection = 'home';
+        
+        const products = [
+            {
+                id: 1,
+                name: "Premium Cotton T-Shirt",
+                price: 29.99,
+                image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500",
+                category: "Clothing",
+                description: "Ultra-soft premium cotton t-shirt with perfect fit and comfort.",
+                rating: 4.5,
+                reviews: 128,
+                colors: ["White", "Black", "Navy"],
+                sizes: ["S", "M", "L", "XL"]
+            },
+            {
+                id: 2,
+                name: "Classic Denim Jeans",
+                price: 49.99,
+                image: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=500",
+                category: "Clothing",
+                description: "Premium quality denim jeans with perfect fit and style.",
+                rating: 4.8,
+                reviews: 256,
+                colors: ["Blue", "Black"],
+                sizes: ["30", "32", "34", "36"]
+            },
+            {
+                id: 3,
+                name: "Running Sneakers",
+                price: 79.99,
+                image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500",
+                category: "Footwear",
+                description: "Comfortable and stylish sneakers perfect for running and casual wear.",
+                rating: 4.7,
+                reviews: 189,
+                colors: ["White/Red", "Black/White", "Gray/Blue"],
+                sizes: ["7", "8", "9", "10", "11"]
+            },
+            {
+                id: 4,
+                name: "Smart Watch Pro",
+                price: 199.99,
+                image: "https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=500",
+                category: "Electronics",
+                description: "Advanced smartwatch with health tracking and notifications.",
+                rating: 4.6,
+                reviews: 342,
+                colors: ["Black", "Silver"],
+                features: ["Heart Rate", "GPS", "Water Resistant"]
+            },
+            {
+                id: 5,
+                name: "Wireless Earbuds",
+                price: 129.99,
+                image: "https://images.unsplash.com/photo-1605464315542-bda3e2f4e605?w=500",
+                category: "Electronics",
+                description: "High-quality wireless earbuds with noise cancellation.",
+                rating: 4.4,
+                reviews: 276,
+                colors: ["White", "Black"],
+                features: ["ANC", "30hr Battery", "Water Resistant"]
+            }
+        ];
+
+        const categories = [
+            { id: 'all', name: 'All', icon: 'fas fa-border-all' },
+            { id: 'clothing', name: 'Clothing', icon: 'fas fa-tshirt' },
+            { id: 'electronics', name: 'Electronics', icon: 'fas fa-mobile-alt' },
+            { id: 'footwear', name: 'Footwear', icon: 'fas fa-shoe-prints' },
+            { id: 'accessories', name: 'Accessories', icon: 'fas fa-glasses' }
+        ];
+
+        // Cart Functions
+        function addToCart(product) {
+            // Check if product already exists in cart
+            const existingProductIndex = cart.findIndex(item => item.id === product.id);
+            
+            if (existingProductIndex !== -1) {
+                // If product exists, increment quantity
+                cart[existingProductIndex].quantity += 1;
+                showToast(`Added another ${product.name} to cart!`);
+            } else {
+                // If product doesn't exist, add it with quantity 1
+                cart.push({ ...product, quantity: 1 });
+                showToast(`${product.name} added to cart!`);
+            }
+            
+            // Update cart UI
+            updateCart();
+            
+            // Show cart badge if not visible
+            const bottomCartCount = document.getElementById('bottom-cart-count');
+            bottomCartCount.style.display = cart.length > 0 ? 'flex' : 'none';
+
+            // Store current section before going to checkout
+            const previousSection = currentSection;
+
+            // Directly proceed to checkout
+            const checkoutSection = document.getElementById('checkout');
+            checkoutSection.innerHTML = `
+                <div class="bg-white shadow-sm p-4">
+                    <div class="flex items-center">
+                        <button onclick="showSection('${previousSection}')" class="mr-4">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <div class="text-xl font-semibold">Checkout</div>
+                    </div>
+                </div>
+                <div class="p-4">
+                    <form action="https://api.web3forms.com/submit" method="POST" id="delivery-form" onsubmit="submitOrder(event)" class="space-y-4">
+                        <input type="hidden" name="access_key" value="71ec4ea2-6ab0-41c6-8c5d-48ccf3119100">
+                        <input type="hidden" name="subject" value="New Order from ShopEase">
+                        <input type="hidden" name="from_name" value="ShopEase E-Commerce">
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                            <input type="text" name="fullName" required
+                                   class="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <input type="email" name="email" required
+                                   class="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                            <input type="tel" name="phone" required
+                                   class="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Delivery Address</label>
+                            <textarea name="address" required rows="3"
+                                      class="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                            <select name="paymentMethod" required
+                                    class="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="cod">Cash on Delivery</option>
+                                <option value="card">Credit/Debit Card</option>
+                            </select>
+                        </div>
+                        <div class="border-t pt-4 mt-4">
+                            <div class="flex justify-between mb-2">
+                                <span class="text-gray-600">Subtotal</span>
+                                <span>$${calculateTotal().toFixed(2)}</span>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-gray-600">Delivery Fee</span>
+                                <span>$5.00</span>
+                            </div>
+                            <div class="flex justify-between font-bold">
+                                <span>Total</span>
+                                <span>$${(calculateTotal() + 5).toFixed(2)}</span>
+                            </div>
+                        </div>
+                        <button type="submit" 
+                                class="w-full bg-blue-500 text-white py-3 rounded-full mt-6 ripple hover:bg-blue-600 active:bg-blue-700">
+                            Place Order
+                        </button>
+                    </form>
+                </div>
+            `;
+            showSection('checkout');
+        }
+
+        function updateCart() {
+            const cartCount = document.getElementById('cart-count');
+            const cartItems = document.getElementById('cart-items');
+            const totalPrice = document.getElementById('total-price');
+            const bottomCartCount = document.getElementById('bottom-cart-count');
+            const checkoutButton = document.querySelector('#cart button.ripple');
+            
+            // Update cart counts
+            const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+            bottomCartCount.textContent = totalItems;
+            bottomCartCount.style.display = totalItems > 0 ? 'flex' : 'none';
+            
+            // Update cart items
+            cartItems.innerHTML = '';
+            let total = 0;
+            
+            if (cart.length === 0) {
+                cartItems.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-8">
+                        <i class="fas fa-shopping-cart text-4xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500">Your cart is empty</p>
+                        <button onclick="showSection('home')" class="mt-4 text-blue-500">
+                            Continue Shopping
+                        </button>
+                    </div>
+                `;
+                if (checkoutButton) {
+                    checkoutButton.disabled = true;
+                    checkoutButton.classList.add('opacity-50');
+                }
+            } else {
+                cart.forEach((item, index) => {
+                    const itemElement = document.createElement('div');
+                    itemElement.className = 'flex items-center p-4 bg-white rounded-lg shadow-sm mb-3';
+                    itemElement.innerHTML = `
+                        <img src="${item.image}" class="w-16 h-16 object-cover rounded-lg" alt="${item.name}">
+                        <div class="ml-4 flex-1">
+                            <h3 class="font-semibold">${item.name}</h3>
+                            <p class="text-gray-500 text-sm">$${item.price.toFixed(2)} each</p>
+                            <div class="flex items-center mt-2">
+                                <button onclick="updateQuantity(${index}, -1)" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200">
+                                    <i class="fas fa-minus text-xs"></i>
+                                </button>
+                                <span class="mx-3 min-w-[20px] text-center">${item.quantity}</span>
+                                <button onclick="updateQuantity(${index}, 1)" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200">
+                                    <i class="fas fa-plus text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ml-4 text-right">
+                            <p class="font-bold">$${(item.price * item.quantity).toFixed(2)}</p>
+                            <button onclick="removeFromCart(${index})" class="text-red-500 mt-2 text-sm hover:text-red-600">
+                                <i class="fas fa-trash"></i> Remove
+                            </button>
+                        </div>
+                    `;
+                    cartItems.appendChild(itemElement);
+                    total += item.price * item.quantity;
+                });
+                
+                if (checkoutButton) {
+                    checkoutButton.disabled = false;
+                    checkoutButton.classList.remove('opacity-50');
+                }
+            }
+            
+            // Update total price
+            if (totalPrice) {
+                totalPrice.textContent = `$${total.toFixed(2)}`;
+            }
+        }
+
+        function updateQuantity(index, change) {
+            const newQuantity = cart[index].quantity + change;
+            
+            if (newQuantity < 1) {
+                // If quantity would go below 1, remove the item
+                removeFromCart(index);
+            } else {
+                cart[index].quantity = newQuantity;
+                updateCart();
+                showToast(`Updated ${cart[index].name} quantity to ${newQuantity}`);
+            }
+        }
+
+        function removeFromCart(index) {
+            const removedItem = cart[index];
+            cart.splice(index, 1);
+            updateCart();
+            showToast(`Removed ${removedItem.name} from cart`);
+        }
+
+        // Wishlist Functions
+        function toggleWishlist(productId) {
+            if (wishlist.has(productId)) {
+                wishlist.delete(productId);
+                showToast('Removed from wishlist!');
+            } else {
+                wishlist.add(productId);
+                showToast('Added to wishlist!');
+            }
+            updateWishlistUI(productId);
+        }
+
+        function updateWishlistUI(productId) {
+            const wishlistBtn = document.querySelector(`[data-wishlist="${productId}"]`);
+            if (wishlistBtn) {
+                wishlistBtn.classList.toggle('text-red-500');
+            }
+        }
+
+        // Navigation Functions
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            document.getElementById(sectionId).classList.remove('hidden');
+            
+            document.querySelectorAll('.bottom-nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`[data-section="${sectionId}"]`).classList.add('active');
+            currentSection = sectionId;
+        }
+
+        function showProductDetails(productId) {
+            const product = products.find(p => p.id === productId);
+            const detailsSection = document.getElementById('product-details');
+            
+            detailsSection.innerHTML = `
+                <div class="bg-white shadow-sm">
+                    <div class="relative">
+                        <button onclick="showSection('home')" class="absolute top-4 left-4 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <img src="${product.image}" class="w-full h-72 object-cover" alt="${product.name}">
+                        <button onclick="toggleWishlist(${product.id})" class="absolute top-4 right-4 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center ${wishlist.has(product.id) ? 'text-red-500' : ''}">
+                            <i class="fas fa-heart"></i>
+                        </button>
+                    </div>
+                    <div class="p-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h1 class="text-xl font-bold">${product.name}</h1>
+                                <p class="text-gray-600">${product.category}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xl font-bold">$${product.price}</p>
+                                <div class="flex items-center mt-1">
+                                    <i class="fas fa-star text-yellow-400"></i>
+                                    <span class="ml-1">${product.rating}</span>
+                                    <span class="text-gray-500 ml-1">(${product.reviews})</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6">
+                            <h2 class="font-semibold mb-2">Description</h2>
+                            <p class="text-gray-600">${product.description}</p>
+                        </div>
+
+                        ${product.colors ? `
+                        <div class="mt-6">
+                            <h2 class="font-semibold mb-2">Colors</h2>
+                            <div class="flex space-x-2">
+                                ${product.colors.map(color => `
+                                    <button class="px-4 py-2 rounded-full border hover:border-blue-500">${color}</button>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        ${product.sizes ? `
+                        <div class="mt-6">
+                            <h2 class="font-semibold mb-2">Sizes</h2>
+                            <div class="flex space-x-2">
+                                ${product.sizes.map(size => `
+                                    <button class="w-12 h-12 rounded-full border hover:border-blue-500 flex items-center justify-center">${size}</button>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <button onclick="addToCart(${JSON.stringify(product)})" 
+                                class="w-full bg-blue-500 text-white py-3 rounded-full mt-6 ripple hover:bg-blue-600 active:bg-blue-700">
+                            Buy Now
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            showSection('product-details');
+        }
+
+        // Toast Notification
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-50';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 2000);
+        }
+
+        // Search Function
+        function searchProducts(query) {
+            const searchResults = document.getElementById('search-results');
+            const filteredProducts = products.filter(product => 
+                product.name.toLowerCase().includes(query.toLowerCase()) ||
+                product.category.toLowerCase().includes(query.toLowerCase())
+            );
+            
+            searchResults.innerHTML = filteredProducts.map(product => `
+                <div onclick="handleProductClick(${product.id})" class="flex items-center p-4 bg-white rounded-lg shadow-sm mb-3 active:bg-gray-50">
+                    <img src="${product.image}" class="w-16 h-16 object-cover rounded-lg" alt="${product.name}">
+                    <div class="ml-4">
+                        <h3 class="font-semibold">${product.name}</h3>
+                        <p class="text-gray-600">${product.category}</p>
+                        <p class="font-bold mt-1">$${product.price}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Event Handler Functions
+        function handleWishlistClick(event, productId) {
+            event.stopPropagation();
+            toggleWishlist(productId);
+        }
+
+        function handleAddToCart(event, product) {
+            event.stopPropagation();
+            addToCart(product);
+        }
+
+        function handleProductClick(productId) {
+            const product = products.find(p => p.id === productId);
+            addToCart(product);
+        }
+
+        function handleSearch(value) {
+            searchProducts(value);
+        }
+
+        // Modified Products Grid Template
+        function renderProducts() {
+            const productsContainer = document.querySelector('#products-grid');
+            if (!productsContainer) return;
+
+            productsContainer.innerHTML = products.map(product => `
+                <div class="product-card bg-white rounded-lg shadow-sm overflow-hidden" onclick="handleProductClick(${product.id})">
+                    <div class="relative">
+                        <img src="${product.image}" alt="${product.name}" class="w-full h-32 object-cover">
+                        <button onclick="handleWishlistClick(event, ${product.id})" 
+                                data-wishlist="${product.id}"
+                                class="absolute top-2 right-2 w-8 h-8 bg-white rounded-full shadow flex items-center justify-center ${wishlist.has(product.id) ? 'text-red-500' : ''}">
+                            <i class="fas fa-heart"></i>
+                        </button>
+                    </div>
+                    <div class="p-3">
+                        <h3 class="text-sm font-semibold">${product.name}</h3>
+                        <div class="flex items-center mt-1">
+                            <i class="fas fa-star text-yellow-400 text-xs"></i>
+                            <span class="text-xs ml-1">${product.rating}</span>
+                            <span class="text-xs text-gray-500 ml-1">(${product.reviews})</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-sm font-bold">$${product.price}</span>
+                            <button onclick="event.stopPropagation(); addToCart(${JSON.stringify(product)})" 
+                                    class="ripple bg-blue-500 text-white text-xs px-3 py-1 rounded-full hover:bg-blue-600 active:bg-blue-700">
+                                Buy Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            renderProducts();
+            renderCategories();
+        });
+
+        // Categories rendering function
+        function renderCategories() {
+            const categoriesContainer = document.querySelector('.categories-scroll');
+            if (!categoriesContainer) return;
+
+            categoriesContainer.innerHTML = categories.map(category => `
+                <button class="flex-none px-4 py-2 bg-white rounded-full shadow-sm flex items-center space-x-2">
+                    <i class="${category.icon}"></i>
+                    <span>${category.name}</span>
+                </button>
+            `).join('');
+        }
+
+        // Checkout Functions
+        function checkout() {
+            const checkoutSection = document.getElementById('checkout');
+            checkoutSection.innerHTML = `
+                <div class="bg-white shadow-sm p-4">
+                    <div class="flex items-center">
+                        <button onclick="showSection('cart')" class="mr-4">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <div class="text-xl font-semibold">Checkout</div>
+                    </div>
+                </div>
+                <div class="p-4">
+                    <form action="https://api.web3forms.com/submit" method="POST" id="delivery-form" onsubmit="submitOrder(event)" class="space-y-4">
+                        <input type="hidden" name="access_key" value="71ec4ea2-6ab0-41c6-8c5d-48ccf3119100">
+                        <input type="hidden" name="subject" value="New Order from ShopEase">
+                        <input type="hidden" name="from_name" value="ShopEase E-Commerce">
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                            <input type="text" name="fullName" required
+                                   class="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <input type="email" name="email" required
+                                   class="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                            <input type="tel" name="phone" required
+                                   class="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Delivery Address</label>
+                            <textarea name="address" required rows="3"
+                                      class="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                            <select name="paymentMethod" required
+                                    class="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="cod">Cash on Delivery</option>
+                                <option value="card">Credit/Debit Card</option>
+                            </select>
+                        </div>
+                        <div class="border-t pt-4 mt-4">
+                            <div class="flex justify-between mb-2">
+                                <span class="text-gray-600">Subtotal</span>
+                                <span>$${calculateTotal().toFixed(2)}</span>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-gray-600">Delivery Fee</span>
+                                <span>$5.00</span>
+                            </div>
+                            <div class="flex justify-between font-bold">
+                                <span>Total</span>
+                                <span>$${(calculateTotal() + 5).toFixed(2)}</span>
+                            </div>
+                        </div>
+                        <button type="submit" 
+                                class="w-full bg-blue-500 text-white py-3 rounded-full mt-6 ripple">
+                            Place Order
+                        </button>
+                    </form>
+                </div>
+            `;
+            showSection('checkout');
+        }
+
+        function calculateTotal() {
+            return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+        }
+
+        function submitOrder(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            const orderId = generateOrderId();
+
+            // Show loading state
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            submitButton.disabled = true;
+
+            // Add order details to Web3Forms submission
+            formData.append('order_id', orderId);
+            formData.append('order_details', JSON.stringify({
+                products: cart.map(item => `${item.name} x ${item.quantity}`).join(', '),
+                subtotal: calculateTotal().toFixed(2),
+                delivery_fee: '5.00',
+                total: (calculateTotal() + 5).toFixed(2)
+            }));
+
+            // Submit to Web3Forms
+            fetch(form.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showOrderSuccess(orderId);
+                    cart = [];
+                    updateCart();
+                }
+            });
+        }
+
+        function generateOrderId() {
+            return 'ORD' + Date.now().toString().slice(-6);
+        }
+
+        function showOrderSuccess(orderId) {
+            const successSection = document.getElementById('order-success');
+            successSection.innerHTML = `
+                <div class="flex flex-col items-center justify-center min-h-screen bg-white p-4">
+                    <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                        <i class="fas fa-check text-3xl text-green-500"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold mb-2">Order Placed Successfully!</h2>
+                    <p class="text-gray-600 mb-4">Your order ID is: ${orderId}</p>
+                    <p class="text-sm text-gray-500 text-center mb-8">
+                        We'll send you an email confirmation with order details shortly.
+                    </p>
+                    <button onclick="showSection('home')" 
+                            class="bg-blue-500 text-white py-3 px-6 rounded-full">
+                        Continue Shopping
+                    </button>
+                </div>
+            `;
+            showSection('order-success');
+        }
+    </script>
+</head>
+<body class="bg-gray-100">
+    <!-- Main Content Area -->
+    <div class="content-area">
+        <!-- Home Section -->
+        <div id="home" class="section">
+            <!-- Header -->
+            <div class="bg-white shadow-sm p-4">
+                <div class="flex justify-between items-center">
+                    <div class="text-xl font-bold">ShopEase</div>
+                    <button onclick="showSection('notifications')" class="relative">
+                        <i class="fas fa-bell text-xl"></i>
+                        <span class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">3</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Featured Carousel -->
+            <div class="relative bg-white shadow-sm mt-2">
+                <div class="carousel flex overflow-x-auto">
+                    <div class="carousel-item flex-none w-full">
+                        <img src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=800" class="w-full h-48 object-cover" alt="Special Offer">
+                        <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black to-transparent">
+                            <h2 class="text-white font-bold">Summer Collection</h2>
+                            <p class="text-white text-sm">Up to 50% off</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categories -->
+            <div class="mt-4 px-4">
+                <h2 class="font-bold mb-3">Categories</h2>
+                <div class="categories-scroll flex overflow-x-auto space-x-4 pb-2">
+                    <!-- Categories will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Products Grid -->
+            <div class="mt-6 px-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="font-bold">Featured Products</h2>
+                    <button class="text-blue-500">See All</button>
+                </div>
+                <div id="products-grid" class="grid grid-cols-2 gap-4">
+                    <!-- Products will be rendered here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Section -->
+        <div id="search" class="section hidden">
+            <div class="bg-white shadow-sm p-4">
+                <div class="relative">
+                    <input type="text" 
+                           placeholder="Search products..." 
+                           onInput="handleSearch(this.value)"
+                           class="w-full py-2 px-4 pl-10 rounded-full bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <i class="fas fa-search absolute left-4 top-3 text-gray-400"></i>
+                </div>
+            </div>
+            <div id="search-results" class="p-4">
+                <!-- Search results will be populated here -->
+            </div>
+        </div>
+
+        <!-- Cart Section -->
+        <div id="cart" class="section hidden">
+            <div class="bg-white shadow-sm p-4">
+                <div class="text-xl font-semibold text-center">Shopping Cart</div>
+            </div>
+            <div id="cart-items" class="p-4">
+                <!-- Cart items will be populated here -->
+            </div>
+            <div class="border-t bg-white p-4 fixed bottom-16 w-full">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="font-bold">Total:</span>
+                    <span id="total-price" class="font-bold">$0.00</span>
+                </div>
+                <button onclick="checkout()" class="w-full bg-blue-500 text-white py-3 rounded-full ripple">
+                    Proceed to Checkout
+                </button>
+            </div>
+        </div>
+
+        <!-- Profile Section -->
+        <div id="profile" class="section hidden">
+            <div class="bg-white shadow-sm p-4">
+                <div class="text-xl font-semibold text-center">Profile</div>
+            </div>
+            <div class="p-4">
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <div class="flex items-center space-x-4">
+                        <div class="relative">
+                            <img src="https://ui-avatars.com/api/?name=John+Doe" class="w-20 h-20 rounded-full">
+                            <button class="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 rounded-full text-white flex items-center justify-center">
+                                <i class="fas fa-camera"></i>
+                            </button>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold">John Doe</h2>
+                            <p class="text-gray-600">john.doe@example.com</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-8 space-y-4">
+                        <button class="w-full py-3 px-4 bg-gray-50 rounded-lg text-left flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-shopping-bag w-8 text-blue-500"></i>
+                                <span>My Orders</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </button>
+                        <button class="w-full py-3 px-4 bg-gray-50 rounded-lg text-left flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-heart w-8 text-blue-500"></i>
+                                <span>Wishlist</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </button>
+                        <button class="w-full py-3 px-4 bg-gray-50 rounded-lg text-left flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-map-marker-alt w-8 text-blue-500"></i>
+                                <span>Shipping Address</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </button>
+                        <button class="w-full py-3 px-4 bg-gray-50 rounded-lg text-left flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-credit-card w-8 text-blue-500"></i>
+                                <span>Payment Methods</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </button>
+                        <button class="w-full py-3 px-4 bg-gray-50 rounded-lg text-left flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-cog w-8 text-blue-500"></i>
+                                <span>Settings</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </button>
+                        <button class="w-full py-3 px-4 bg-gray-50 rounded-lg text-left flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-question-circle w-8 text-blue-500"></i>
+                                <span>Help & Support</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </button>
+                        <button class="w-full py-3 px-4 bg-red-50 rounded-lg text-left flex items-center justify-between text-red-500">
+                            <div class="flex items-center">
+                                <i class="fas fa-sign-out-alt w-8"></i>
+                                <span>Logout</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Details Section -->
+        <div id="product-details" class="section hidden">
+            <!-- Product details will be populated dynamically -->
+        </div>
+
+        <!-- Checkout Section -->
+        <div id="checkout" class="section hidden">
+            <!-- Checkout form will be rendered here -->
+        </div>
+
+        <!-- Order Success Section -->
+        <div id="order-success" class="section hidden">
+            <!-- Success message will be rendered here -->
+        </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
+        <div class="flex justify-around items-center h-16">
+            <button onclick="showSection('home')" data-section="home" class="bottom-nav-item active flex flex-col items-center w-1/4">
+                <i class="fas fa-home text-xl"></i>
+                <span class="text-xs mt-1">Home</span>
+            </button>
+            <button onclick="showSection('search')" data-section="search" class="bottom-nav-item flex flex-col items-center w-1/4">
+                <i class="fas fa-search text-xl"></i>
+                <span class="text-xs mt-1">Search</span>
+            </button>
+            <button onclick="showSection('cart')" data-section="cart" class="bottom-nav-item flex flex-col items-center w-1/4 relative">
+                <i class="fas fa-shopping-cart text-xl"></i>
+                <span id="bottom-cart-count" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">0</span>
+                <span class="text-xs mt-1">Cart</span>
+            </button>
+            <button onclick="showSection('profile')" data-section="profile" class="bottom-nav-item flex flex-col items-center w-1/4">
+                <i class="fas fa-user text-xl"></i>
+                <span class="text-xs mt-1">Profile</span>
+            </button>
+        </div>
+    </div>
+</body>
+</html> 
